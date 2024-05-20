@@ -2,12 +2,19 @@ package Controller;
 
 import java.io.File;
 import java.io.IOException;
+import java.io.InputStream;
 import java.io.PrintWriter;
+import java.nio.file.Files;
+import java.nio.file.Path;
 import java.sql.SQLException;
 import java.time.LocalDateTime;
 import java.time.format.DateTimeFormatter;
+import java.util.Arrays;
 import java.util.Collection;
+import java.util.HashMap;
 import java.util.Iterator;
+import java.util.List;
+import java.util.Map;
 
 import javax.servlet.RequestDispatcher;
 import javax.servlet.ServletException;
@@ -30,6 +37,17 @@ public class UploadGame extends HttpServlet {
 	private static final long serialVersionUID = 1L;
 	static String SAVE_DIR = "img";
 	static ProductModel GameModels = new ProductModelDM();
+	private static final List<String> ALLOWED_EXTENSIONS = Arrays.asList("jpg", "jpeg", "png", "gif");
+
+	// Mappa dei magic numbers per le immagini consentite
+	private static final Map<String, byte[]> MAGIC_NUMBERS = new HashMap<>();
+
+	static {
+	    MAGIC_NUMBERS.put("jpg", new byte[]{(byte) 0xFF, (byte) 0xD8, (byte) 0xFF});
+	    MAGIC_NUMBERS.put("jpeg", new byte[]{(byte) 0xFF, (byte) 0xD8, (byte) 0xFF});
+	    MAGIC_NUMBERS.put("png", new byte[]{(byte) 0x89, 'P', 'N', 'G'});
+	    MAGIC_NUMBERS.put("gif", new byte[]{'G', 'I', 'F'});
+	}
 	
 	DateTimeFormatter dtf = DateTimeFormatter.ofPattern("yyyy-MM-dd");
 	LocalDateTime now = LocalDateTime.now();
@@ -72,10 +90,19 @@ public class UploadGame extends HttpServlet {
 				fileName = extractFileName(part);
 			
 				if (fileName != null && !fileName.equals("")) {
-					part.write(savePath + File.separator + fileName);
-					g1.setImg(fileName);
-					
-					message = message + fileName + "\n";
+					// Validazione dell'estensione del file
+	                if (isAllowedExtension(fileName)) {
+	                    // Validazione del contenuto del file
+	                    if (isValidFileContent(part, fileName)) {
+	                        part.write(savePath + File.separator + fileName);
+	                        g1.setImg(fileName);
+	                        message = message + fileName + "\n";
+	                    } else {
+	                        request.setAttribute("error", "Errore: Il contenuto del file non è valido");
+	                    }
+	                } else {
+	                    request.setAttribute("error", "Errore: Estensione del file non consentita");
+	                }
 				} else {
 					request.setAttribute("error", "Errore: Bisogna selezionare almeno un file");
 				}
@@ -115,6 +142,30 @@ public class UploadGame extends HttpServlet {
 			}
 		}
 		return "";
+	}
+	private boolean isAllowedExtension(String fileName) {
+	    String fileExtension = fileName.substring(fileName.lastIndexOf('.') + 1).toLowerCase();
+	    return ALLOWED_EXTENSIONS.contains(fileExtension);
+	}
+
+	private boolean isValidFileContent(Part part, String fileName) {
+	    String fileExtension = fileName.substring(fileName.lastIndexOf('.') + 1).toLowerCase();
+	    byte[] expectedMagicNumber = MAGIC_NUMBERS.get(fileExtension);
+
+	    if (expectedMagicNumber == null) {
+	        return false;
+	    }
+
+	    try (InputStream inputStream = part.getInputStream()) {
+	        byte[] fileMagicNumber = new byte[expectedMagicNumber.length];
+	        if (inputStream.read(fileMagicNumber) != fileMagicNumber.length) {
+	            return false;
+	        }
+	        return Arrays.equals(fileMagicNumber, expectedMagicNumber);
+	    } catch (IOException e) {
+	        e.printStackTrace();
+	        return false;
+	    }
 	}
 	
 
