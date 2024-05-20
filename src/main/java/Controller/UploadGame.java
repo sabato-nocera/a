@@ -146,7 +146,7 @@ public class UploadGame extends HttpServlet {
 	private boolean isAllowedExtension(String fileName) {
 	    String fileExtension = fileName.substring(fileName.lastIndexOf('.') + 1).toLowerCase();
 	    return ALLOWED_EXTENSIONS.contains(fileExtension);
-	}
+	} 
 
 	private boolean isValidFileContent(Part part, String fileName) {
 	    String fileExtension = fileName.substring(fileName.lastIndexOf('.') + 1).toLowerCase();
